@@ -50,6 +50,11 @@ void run(int pid) {
 }
 
 int main() {
+
+#ifdef LOCAL
+  freopen("./test/UVa210.in", "r", stdin);
+#endif
+
   int T;
   scanf("%d", &T);
   while(T--) {
