@@ -52,7 +52,7 @@ void run(int pid) {
 int main() {
 
 #ifdef LOCAL
-  freopen("./test/UVa210.in", "r", stdin);
+  freopen("./sample_input", "r", stdin);
 #endif
 
   int T;

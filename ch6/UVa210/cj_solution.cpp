@@ -8,135 +8,126 @@
 
 using namespace std;
 
+// global variables
+
+int numOfProg;
+vector<int> pc; // program counter, pc[pid], track each program's current line number
+vector<string> prog;
+deque<int> readyQ;
+queue<int> blockQ;
+int numOfStatement = 5; // there are 5 types of statements;
+vector<int> quantumVec(5, 0); // quantum for each type of operation
+map<string, int> varMap; // variable map <name, value>
+int qt; // quantum;
+bool locked;
+
+// run a progam
+// pid: program id
+void run(int pid) {
+
+  int currQt = qt;
+  while(currQt > 0) {
+
+    // get the statement
+    string op = prog[pc[pid]];
+
+    if (op.find("=") != std::string::npos) { // assignment
+
+      string varName = op.substr(0, 1);
+      string varValue = op.substr(op.find("=")+1);
+      int value = stoi(varValue);
+      varMap[varName] = value; 
+      currQt -= quantumVec[0];
+
+    } else if (op.find("print") != std::string::npos) {
+
+      string varName = op.substr(6,6);
+      if (!varMap.count(varName)) {
+        varMap[varName] = 0; 
+      } 
+      cout << pid+1; 
+      cout << ": ";
+      cout << varMap[varName] << endl;
+      currQt -= quantumVec[1];
+
+    } else if (op.find("lock") != std::string::npos && op[0]=='l') {
+
+      if (locked) {
+        blockQ.push(pid);
+        return;
+      } else {
+        locked = true;
+        currQt -= quantumVec[2];
+      }
+
+    } else if (op.find("unlock") != std::string::npos) {
+
+      locked = false;
+      if (!blockQ.empty()) {
+        int blockedPid = blockQ.front();
+        blockQ.pop();
+        readyQ.push_front(blockedPid);
+      }
+      currQt -= quantumVec[3];
+
+    } else { // end
+      return;
+    } 
+    pc[pid]++;
+  }
+  readyQ.push_back(pid);
+} // end of run(); 
+
 int main() {
 
 #ifdef LOCAL
-  freopen("data.in", "r", stdin);
+  freopen("sample_input", "r", stdin);
 #endif
 
   int kase;
   cin >> kase;
-  for (int i = 0; i < kase; ++i) {
+  while (kase--) {
 
-    // read num of programs
-    int numOfPrograms;
-    cin >> numOfPrograms;
-    queue<int> readyQueue;
-    queue<int> blockQueue;
-    for (int j = 0; j < numOfPrograms; ++j) {
-      readyQueue.push(j+1);
-    }
-
-    // read operation qt
-    vector<int> operationQtVec;
-    for (int j = 0; j < 5; ++j) {
+    cin >> numOfProg;
+    for (int i = 0; i < numOfStatement; ++i) {
       int x;
       cin >> x;
-      operationQtVec.push_back(x);
+      quantumVec[i] = x;
     }
-
-    // read qt
-    int qt;
     cin >> qt;
-   
+
     // read statements of each program
-    map<int, queue<string>> programMap;
     string opStr;
-    int n = 1;
-    while (getline(cin,opStr) && n<numOfPrograms+1) {
-      if (opStr != "") {
-        programMap[n].push(opStr);
+    int line = 0;
+    pc.clear();
+    prog.clear();
+    for (int j = 0; j < numOfProg; j++) {
+      getline(cin, opStr);
+      while (opStr == "") {
+        getline(cin, opStr);
       }
-      if (opStr == "end") {
-        n++;
+      pc.push_back(line);
+      while(opStr != "end") {
+        prog.push_back(opStr);
+        line++;
+        getline(cin, opStr);
       }
+      prog.push_back(opStr);
+      line++;
+      readyQ.push_back(j); 
     }
 
-    // lock
-    bool lock = false;
-
-    // start execution
-    map<string, int> varMap; // variable map <name, value>
-    while (!readyQueue.empty()) {
-      
-      int programID = readyQueue.front();
-      int currQt = qt;
-
-      while(currQt > 0) {
-
-        string op = programMap[programID].front();
-
-        if (op.find("=") != std::string::npos) {
-
-          string varName = op.substr(0, 1);
-          string varValue = op.substr(op.find("=")+1);
-          int value = stoi(varValue);
-          varMap[varName] = value; 
-          currQt -= operationQtVec[0];
-          programMap[programID].pop();
-
-        } else if (op.find("print") != std::string::npos) {
-
-          string varName = op.substr(6,6);
-          if (varMap.count(varName)) {
-            cout << programID; 
-            cout << ": ";
-            cout << varMap[varName] << endl;
-          }
-          currQt -= operationQtVec[1];
-          programMap[programID].pop();
-
-        } else if (op.find("lock") != std::string::npos && op[0]=='l') {
-
-          if (lock) {
-            currQt = 0;
-          } else {
-            lock = true;
-            currQt -= operationQtVec[2];
-            programMap[programID].pop();
-          }
-
-        } else if (op.find("unlock") != std::string::npos) {
-
-          lock = false;
-          queue<int> temp = readyQueue;
-          // clear readyQueue
-          while(!readyQueue.empty()) {
-            readyQueue.pop();
-          }
-          readyQueue.push(programID);
-          for (unsigned int k = 0; k < blockQueue.size(); ++k) {
-            readyQueue.push(blockQueue.front());
-            blockQueue.pop();
-          }
-          temp.pop();
-          for (unsigned int k = 0; k < temp.size(); ++k) {
-            readyQueue.push(temp.front());
-            temp.pop();
-          }
-          // clear blockqueue
-          while(!blockQueue.empty()) {
-            blockQueue.pop();
-          }
-          currQt -= operationQtVec[3];
-          programMap[programID].pop();
-
-        } else {
-
-          currQt = 0;
-          programMap[programID].pop();
-
-        } 
-        if (currQt <= 0) {
-          readyQueue.pop();
-          if (! (op.find("end") != std::string::npos)) {
-            readyQueue.push(programID);
-          }
-        }
-      }
+    locked = false;
+    varMap.clear();
+    while (!readyQ.empty()) {
+      int pid = readyQ.front(); 
+      readyQ.pop_front();
+      run(pid);
     }
 
-    cout << endl;
+    if (kase) {
+      cout << endl;
+    }
   }
   return 0;  
 }
